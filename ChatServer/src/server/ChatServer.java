@@ -1,50 +1,45 @@
 package server;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
+import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
- * ChatServer - Khởi tạo ServerSocket và lắng nghe kết nối từ Client (Phase 1).
+ * ChatServer - Khởi tạo ServerSocket, quản lý UserManager, FileTransferService và phân phối luồng.
  */
 public class ChatServer {
     private static final int DEFAULT_PORT = 8888;
+    private static final ExecutorService threadPool = Executors.newCachedThreadPool();
+    // Quản lý trạng thái và danh sách người dùng toàn Server
+    private static final UserManager userManager = new UserManager();
+    // Dịch vụ truyền nhận file chuyên dụng (Port 8889)
+    private static final FileTransferService fileTransferService = new FileTransferService();
 
     public static void main(String[] args) {
         int port = DEFAULT_PORT;
-        ServerLogger.log("Khởi động Chat Server tại port " + port + "...");
+        ServerLogger.log("Khởi động Chat Server (Phase 5: File Transfer) tại port " + port + "...");
 
-        // Mở ServerSocket lắng nghe trên port 8888
+        // Khởi động dịch vụ truyền nhận file tại port 8889
+        fileTransferService.start(Protocol.FILE_PORT);
+
         try (ServerSocket serverSocket = new ServerSocket(port)) {
-            ServerLogger.log("Server đã sẵn sàng lắng nghe kết nối...");
+            ServerLogger.log("Server Chat đã sẵn sàng phục vụ tại port " + port + "...");
 
-            while (true) {
-                ServerLogger.log("Đang chờ Client kết nối đến...");
-                // Chờ Client kết nối đến Server (chặn luồng cho đến khi có Client kết nối)
+            while (!serverSocket.isClosed()) {
                 Socket clientSocket = serverSocket.accept();
-                ServerLogger.log("Client đã kết nối từ: " + clientSocket.getRemoteSocketAddress());
+                ServerLogger.log("Chấp nhận kết nối Socket từ: " + clientSocket.getRemoteSocketAddress());
 
-                // Tạo luồng đọc và ghi dữ liệu dạng text
-                BufferedReader reader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-                PrintWriter writer = new PrintWriter(clientSocket.getOutputStream(), true);
-
-                // Đọc tin nhắn gửi từ Client
-                String clientMessage = reader.readLine();
-                ServerLogger.log("Nhận từ Client: " + clientMessage);
-
-                // Gửi phản hồi xác nhận lại cho Client
-                String responseMessage = "CONNECTED|Server chào bạn! Kết nối TCP thành công.";
-                writer.println(responseMessage);
-                ServerLogger.log("Đã gửi phản hồi cho Client: " + responseMessage);
-
-                // Đóng kết nối phiên kiểm tra Phase 1
-                clientSocket.close();
-                ServerLogger.log("Đã đóng kết nối Client hiện tại. Tiếp tục chờ kết nối mới...\n");
+                // Giao việc xử lý kết nối cho luồng riêng với UserManager và FileTransferService
+                ClientHandler clientHandler = new ClientHandler(clientSocket, userManager, fileTransferService);
+                threadPool.execute(clientHandler);
             }
-        } catch (Exception e) {
-            ServerLogger.error("Lỗi xảy ra tại Server: " + e.getMessage(), e);
+        } catch (IOException e) {
+            ServerLogger.error("Lỗi ServerSocket: " + e.getMessage(), e);
+        } finally {
+            threadPool.shutdown();
+            ServerLogger.log("Chat Server đã dừng.");
         }
     }
 }

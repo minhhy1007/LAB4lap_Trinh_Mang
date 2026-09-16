@@ -1,0 +1,4 @@
+Xin chao! Day la file demo truyen qua TCP Socket trong do an Java Chat & File Transfer.
+Kien truc: Skype / Napster Hybrid Model.
+Chunk size: 4096 bytes.
+Transfer status: SUCCESSFUL!

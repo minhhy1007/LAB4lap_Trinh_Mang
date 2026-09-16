@@ -19,7 +19,16 @@ repositories {
 sourceSets {
     main {
         java {
-            srcDirs = ['ChatServer/src', 'ChatClient/src', 'src/main/java']
+            srcDirs = ['ChatServer/src', 'ChatClient/src']
         }
     }
+}
+
+tasks.withType(JavaCompile) {
+    options.encoding = 'UTF-8'
+}
+
+tasks.withType(JavaExec) {
+    jvmArgs '-Dfile.encoding=UTF-8'
+    standardInput = System.in
 }
